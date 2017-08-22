@@ -2,51 +2,51 @@
 
 /**
  * @package Lms_Api
- * @version 1.0
+ * @version 1.1
  */
 
 /*
   Plugin Name: Lms_Api
-  Plugin URI: https://github.com/yaxhpal/wordpress/plugins/lms-api
+  Plugin URI: https://github.com/yaxhpal/wordpress/tree/master/plugins/lms-api
   Description: Plugin to access LMS APIs
   Author: Yashpal Meena <yaxhpal@gmil.com>
-  Version: 1.0
+  Version: 1.1
   Author URI: http://www.yashpalmeena.com/
 */
  
 class Lms_Api {
  
-  // Here initialize our namespace and resource name.
-  public function __construct() {
-        $version = '1';
-        $this->namespace  = 'lmsapi/v' . $version;
-        $this->base = 'user';
-  }
- 
-  /**
-   * Register the routes for the objects of the controller.
-   */
-  public function register_routes() {
-    register_rest_route( $this->namespace, '/' . $this->base, array(
-        'methods'         => WP_REST_Server::CREATABLE,
-        'callback'        => array( $this, 'create_user' )
-    ));
-  }
+  const LMS_CAPTURE_API_URL = 'http://lms.peerlearning.com/api/v1/users/capture_lead.json';
+  const LMS_REFERER = 'avanti.in';
+  const LEAD_SQUARED_ORIGIN = 'https://web.mxradon.com';
   
+
   /**
-   * Create one item from the collection
-   *
-   * @param WP_REST_Request $request Full data about the request.
+   * Create student user on LMS
    * @return WP_Error|WP_REST_Request
    */
-  public function create_user( $request ) {
-    $user_params = $request["student"];
-    $refer = "avanti.in";
-    $api_url = "http://lms.peerlearning.com/api/v1/users/capture_lead.json";
-    $postRes = $this->postRequest($api_url, $user_params, $refer);
-    return new WP_REST_Response( $postRes, 200 );
-  }
+  public function create_user_via_lead() {
 
+    $headerOrigin = $_SERVER['HTTP_ORIGIN'];
+    
+    if( $headerOrigin == self::LEAD_SQUARED_ORIGIN) {
+      
+      $data = array('first_name' => $_POST['FirstName'], 
+        'last_name' => $_POST['LastName'],
+        'phone' => $_POST['Phone'],
+        'email' => $_POST['EmailAddress'],
+        'address' => $_POST['mx_City'],
+        'grade' => str_replace("Class ", "", $_POST['mx_Class_Content_sales']));
+      
+      $user_params = http_build_query($data);
+      $refer = self::LMS_REFERER;
+      $api_url = self::LMS_CAPTURE_API_URL;
+
+      // Send user info to LMS 
+      $postRes = $this->postRequest($api_url, $user_params, $refer);
+    }
+  }
+    
   /**
   * Curl send post request, support HTTPS protocol
   * @param string $url The request url
@@ -96,14 +96,10 @@ class Lms_Api {
 }
 
 // Function to register our new routes from the controller.
-function register_lms_rest_api_routes() {
+function register_hook_for_lms_api() {
     $controller = new Lms_Api();
-    $controller->register_routes();
+    $controller->create_user_via_lead();
 }
 
-add_action( 'rest_api_init', 'register_lms_rest_api_routes');
-
-
-
-
-
+// add_action( 'rest_api_init', 'register_lms_rest_api_routes');
+add_action( 'init', 'register_hook_for_lms_api' );
